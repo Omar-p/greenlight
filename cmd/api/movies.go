@@ -3,21 +3,33 @@ package main
 import (
 	"fmt"
 	"greenlight/internal/data"
+	"greenlight/internal/validator"
 	"net/http"
 	"time"
 )
 
+type createMovieRequest struct {
+	Title   string       `json:"title"`
+	Year    int32        `json:"year"`
+	Runtime data.Runtime `json:"runtime"`
+	Genres  []string     `json:"genres"`
+}
+
 // Add a createMovieHandler for the "POST /v1/movies" endpoint.
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		Title   string   `json:"title"`
-		Year    int32    `json:"year"`
-		Runtime int32    `json:"runtime"`
-		Genres  []string `json:"genres"`
-	}
+	var input createMovieRequest
 
 	if err := app.readJSON(w, r, &input); err != nil {
 		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	movie := createMovieRequestToMovie(input)
+
+	v := validator.New()
+
+	if data.ValidateMovie(v, movie); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -43,5 +55,14 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 
 	if err := app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil); err != nil {
 		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func createMovieRequestToMovie(input createMovieRequest) *data.Movie {
+	return &data.Movie{
+		Title:   input.Title,
+		Year:    input.Year,
+		Runtime: input.Runtime,
+		Genres:  input.Genres,
 	}
 }
